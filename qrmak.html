@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate QR Code with Image</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding-top: 20px;
+        }
+        #video {
+            width: 100%;
+            max-width: 600px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            display: block;
+        }
+        #qr-result {
+            margin-top: 20px;
+            color: red;
+            font-weight: bold;
+        }
+        #file-input {
+            margin-top: 20px;
+        }
+        #qr-code {
+            margin-top: 20px;
+        }
+        #generated-qr {
+            max-width: 300px;
+            margin-top: 10px;
+        }
+        #download-link {
+            margin-top: 20px;
+            display: none;
+        }
+        #progress-bar-container {
+            margin-top: 20px;
+            width: 100%;
+            background-color: #ddd;
+            border-radius: 5px;
+            height: 20px;
+        }
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #4CAF50;
+            border-radius: 5px;
+        }
+        #progress-text {
+            text-align: center;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        #capture-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        #capture-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Generate QR Code with Image</h1>
+    
+    <!-- Webcam Video Feed -->
+    <video id="video" autoplay></video>
+
+    <!-- File Input to Upload Image -->
+    <input type="file" id="file-input" accept="image/*" />
+
+    <!-- Button to capture image from webcam -->
+    <button id="capture-btn">Capture Image</button>
+
+    <div id="qr-result"></div>
+    
+    <div id="qr-code">
+        <h2>Generated QR Code</h2>
+        <img id="generated-qr" src="" alt="Generated QR Code" />
+        <a id="download-link" href="" download="qr_code.png">Download QR Code</a>
+    </div>
+
+    <!-- Progress Bar -->
+    <div id="progress-bar-container">
+        <div id="progress-bar"></div>
+    </div>
+    <div id="progress-text">Image Size: 0 characters / 2,490 characters (Max)</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+    <script>
+        const video = document.getElementById('video');
+        const fileInput = document.getElementById('file-input');
+        const captureBtn = document.getElementById('capture-btn');
+        const qrResult = document.getElementById('qr-result');
+        const qrCodeDiv = document.getElementById('qr-code');
+        const generatedQRCode = document.getElementById('generated-qr');
+        const downloadLink = document.getElementById('download-link');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+
+        // Max QR code size (in characters)
+        const MAX_QR_CODE_SIZE = 2450; // Maximum allowed characters for the QR code
+
+        // Max resolution for the image
+        const MAX_IMAGE_WIDTH = 42;
+        const MAX_IMAGE_HEIGHT = 33;
+
+        // Start the camera to capture images
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+                video.setAttribute('playsinline', true);
+                video.play();
+            } catch (err) {
+                console.error('Error accessing the camera: ', err);
+                qrResult.textContent = 'Error accessing the camera. Please try again.';
+            }
+        }
+
+        // Capture image from webcam when button is clicked
+        captureBtn.addEventListener('click', function () {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            // Set canvas size to match max resolution
+            canvas.width = MAX_IMAGE_WIDTH;
+            canvas.height = MAX_IMAGE_HEIGHT;
+
+            // Scale the video feed to fit the canvas
+            context.drawImage(video, 0, 0, MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT);
+
+            // Convert to Base64
+            const base64Image = canvas.toDataURL('image/jpeg');
+            processImageForQRCode(base64Image);
+        });
+
+        // Handle file input (image upload)
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    const base64Image = event.target.result; // Base64 image data from file
+                    processImageForQRCode(base64Image);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Process the image to ensure it fits within the QR code character limit
+        function processImageForQRCode(base64Image) {
+           
+            let resizedBase64 = base64Image;
+
+           
+
+            updateProgressBar(resizedBase64);
+
+            if (resizedBase64.length > MAX_QR_CODE_SIZE) {
+                qrResult.textContent = 'Image is too large to encode in QR Code.';
+                qrCodeDiv.style.display = 'none';
+                return;
+            }
+
+            generateQRCodeFromImage(resizedBase64);
+        }
+
+        // Compress image by reducing the quality
+        function compressImage(base64Image, quality) {
+            const img = new Image();
+            img.src = base64Image;
+
+            // Ensure compression finishes before processing
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = MAX_IMAGE_WIDTH;
+            canvas.height = MAX_IMAGE_HEIGHT;
+
+            context.drawImage(img, 0, 0, canvas.width, canvas.height);
+            return canvas.toDataURL('image/jpeg', quality);
+        }
+
+        // Update progress bar based on image size (in characters)
+        function updateProgressBar(base64Image) {
+            const imageSize = base64Image.length; // Character count of Base64 string
+
+            // Calculate progress as a percentage
+            const sizeInPercent = (imageSize / MAX_QR_CODE_SIZE) * 100;
+
+            // Update progress bar width and text
+            progressBar.style.width = `${sizeInPercent}%`;
+            progressText.textContent = `Image Size: ${imageSize} characters / ${MAX_QR_CODE_SIZE} characters (Max)`;
+        }
+
+        // Generate QR code with Base64 image data
+        function generateQRCodeFromImage(base64Image) {
+            const qrData = `TPDC_${base64Image.split(',')[1]}`; // Add prefix and extract Base64 part
+            QRCode.toDataURL(qrData, { width: 3000, height: 3000 }, function (err, url) {
+                if (err) {
+                    console.error('Error generating QR code:', err);
+                    qrResult.textContent = 'Error generating QR code. Please try again.';
+                    return;
+                }
+                generatedQRCode.src = url;
+                qrCodeDiv.style.display = 'block';
+                downloadLink.href = url;
+                downloadLink.style.display = 'inline';
+                qrResult.textContent = 'QR Code Generated Successfully!';
+            });
+        }
+
+        // Start camera when page is ready
+        startCamera();
+    </script>
+
+</body>
+</html>

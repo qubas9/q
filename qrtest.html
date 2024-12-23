@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Maximum QR Code Size</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding-top: 20px;
+        }
+        #video {
+            width: 100%;
+            max-width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            display: none;
+        }
+        #qr-code {
+            margin-top: 20px;
+        }
+        #generated-qr {
+            max-width: 300px;
+            margin-top: 10px;
+        }
+        #test-button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #test-button:hover {
+            background-color: #45a049;
+        }
+        #progress-bar-container {
+            margin-top: 20px;
+            width: 100%;
+            background-color: #ddd;
+            border-radius: 5px;
+            height: 20px;
+        }
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #4CAF50;
+            border-radius: 5px;
+        }
+        #progress-text {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        #max-size-result {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Test Maximum QR Code Size</h1>
+    <button id="test-button">Start Test for Max QR Code Size</button>
+
+    <div id="progress-bar-container">
+        <div id="progress-bar"></div>
+    </div>
+    <div id="progress-text">Progress: 0%</div>
+
+    <div id="max-size-result"></div>
+
+    <div id="qr-code">
+        <h2>Generated QR Code</h2>
+        <img id="generated-qr" src="" alt="Generated QR Code" />
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+    <script>
+        const testButton = document.getElementById('test-button');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const maxSizeResult = document.getElementById('max-size-result');
+        const generatedQRCode = document.getElementById('generated-qr');
+
+        const MAX_QR_CHARACTERS = 7089; // Max character limit for QR code
+
+        // Function to generate a QR code with a given data size
+        async function testQRCodeSize(dataSize) {
+            return new Promise((resolve) => {
+                const testData = 'A'.repeat(dataSize); // Generate test data
+                QRCode.toDataURL(testData, { width: 300, height: 300 }, (err, url) => {
+                    resolve(!err); // Return true if QR code generation succeeds
+                });
+            });
+        }
+
+        // Function to find the maximum QR code size
+        async function findMaxQRCodeSize() {
+            let lowerBound = 1;
+            let upperBound = MAX_QR_CHARACTERS;
+            let maxSize = 0;
+
+            // Binary search to find the max size
+            while (lowerBound <= upperBound) {
+                const midSize = Math.floor((lowerBound + upperBound) / 2);
+                progressText.textContent = `Testing size: ${midSize}`;
+                const isValid = await testQRCodeSize(midSize);
+
+                if (isValid) {
+                    maxSize = midSize; // Update max size if valid
+                    lowerBound = midSize + 1;
+                } else {
+                    upperBound = midSize - 1;
+                }
+
+                // Update progress bar
+                const progress = Math.round((lowerBound / MAX_QR_CHARACTERS) * 100);
+                progressBar.style.width = `${progress}%`;
+                progressText.textContent = `Progress: ${progress}%`;
+            }
+
+            return maxSize;
+        }
+
+        // Event listener for the test button
+        testButton.addEventListener('click', async () => {
+            testButton.disabled = true;
+            maxSizeResult.textContent = 'Testing... Please wait.';
+
+            const maxSize = await findMaxQRCodeSize();
+
+            // Display the results
+            maxSizeResult.textContent = `Maximum QR Code Size: ${maxSize} characters`;
+
+            // Generate a QR code with the maximum size
+            const testData = 'A'.repeat(maxSize);
+            QRCode.toDataURL(testData, { width: 300, height: 300 }, (err, url) => {
+                if (!err) {
+                    generatedQRCode.src = url;
+                }
+            });
+
+            testButton.disabled = false;
+        });
+    </script>
+
+</body>
+</html>
