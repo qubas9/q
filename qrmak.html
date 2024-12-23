@@ -207,7 +207,7 @@
         // Generate QR code with Base64 image data
         function generateQRCodeFromImage(base64Image) {
             const qrData = `TPDC_${base64Image.split(',')[1]}`; // Add prefix and extract Base64 part
-            QRCode.toDataURL(qrData, { width: 3000, height: 3000 }, function (err, url) {
+            QRCode.toDataURL(qrData, { errorCorrectionLevel: 'M',width: 3000, height: 3000 }, function (err, url) {
                 if (err) {
                     console.error('Error generating QR code:', err);
                     qrResult.textContent = 'Error generating QR code. Please try again.';

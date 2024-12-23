@@ -96,6 +96,13 @@
                 qrResult.textContent = 'QR Code with TPDC prefix detected!';
                 const base64ImageData = qrData.slice(5); // Remove 'TPDC_' prefix
                 savedImage.src = `data:image/png;base64,${base64ImageData}`;
+                savedImage.onload = function() {
+                    // Scale up the image if it's too small
+                    if (savedImage.width < 100 || savedImage.height < 100) {
+                        savedImage.style.width = '50%'; // Scale image to fit its container
+                        savedImage.style.height = 'auto';
+                    }
+                };
                 savedImage.style.display = 'block';
             } else {
                 // If QR code does not start with TPDC_, just show the data as text

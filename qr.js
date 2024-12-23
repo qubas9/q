@@ -7,7 +7,7 @@ async function generateQRCode(data, outputPath) {
     const Data = data;
     
     try {
-        await QRCode.toFile(outputPath, Data);
+        await QRCode.toFile(outputPath, Data,{errorCorrectionLevel: 'Q'});
         console.log(`QR code saved to ${outputPath}`);
         return outputPath;
     } catch (err) {
@@ -41,5 +41,5 @@ async function createNestedQRCode(innerData) {
 }
 
 // Example usage
-const innerData = 'This is the inner QR code data';
+const innerData = 'Vesele Vanoce s Q';
 createNestedQRCode(innerData);
