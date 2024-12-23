@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Scanner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding-top: 20px;
+        }
+        #video {
+            width: 100%;
+            max-width: 600px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        #qr-result {
+            margin-top: 20px;
+        }
+        #saved-image {
+            margin-top: 20px;
+            max-width: 100%;
+            height: auto;
+            display: none;
+        }
+        #file-input {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>QR Code Scanner</h1>
+    
+    <!-- Webcam Video Feed -->
+    <video id="video" autoplay></video>
+
+    <!-- File Input to Upload QR Code Image -->
+    <input type="file" id="file-input" accept="image/*" />
+
+    <div id="qr-result"></div>
+    <img id="saved-image" src="" alt="QR Code Image" />
+
+    <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
+    <script>
+        const video = document.getElementById('video');
+        const canvasElement = document.createElement('canvas');
+        const canvas = canvasElement.getContext('2d');
+        const savedImage = document.getElementById('saved-image');
+        const qrResult = document.getElementById('qr-result');
+        const fileInput = document.getElementById('file-input');
+        let scanning = false;
+
+        // Start the camera to scan QR codes
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+                video.setAttribute('playsinline', true);
+                video.play();
+                requestAnimationFrame(scanQRCode);
+            } catch (err) {
+                console.error('Error accessing the camera: ', err);
+                qrResult.textContent = 'Error accessing the camera. Please try again.';
+            }
+        }
+
+        // Scan the QR code from the video feed
+        function scanQRCode() {
+            if (scanning) return;
+            scanning = true;
+            canvasElement.height = video.videoHeight;
+            canvasElement.width = video.videoWidth;
+            canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+
+            const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+            if (code) {
+                scanning = false;
+                const qrData = code.data;
+                console.log('Decoded QR Code Data:', qrData); // Log data for debugging
+                processQRCodeData(qrData);
+            } else {
+                scanning = false;
+            }
+            requestAnimationFrame(scanQRCode);
+        }
+
+        // Process the decoded QR code data
+        function processQRCodeData(qrData) {
+            if (qrData.startsWith('TPDC_')) {
+                // If QR code starts with TPDC_ prefix, display the image
+                qrResult.textContent = 'QR Code with TPDC prefix detected!';
+                const base64ImageData = qrData.slice(5); // Remove 'TPDC_' prefix
+                savedImage.src = `data:image/png;base64,${base64ImageData}`;
+                savedImage.style.display = 'block';
+            } else {
+                // If QR code does not start with TPDC_, just show the data as text
+                qrResult.textContent = `QR Code Data: ${qrData}`;
+                savedImage.style.display = 'none';
+            }
+        }
+
+        // Handle file input (image upload)
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    const imgElement = new Image();
+                    imgElement.src = event.target.result;
+                    imgElement.onload = function () {
+                        decodeImage(imgElement);
+                    };
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Decode QR code from uploaded image
+        function decodeImage(image) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = image.width;
+            canvas.height = image.height;
+            context.drawImage(image, 0, 0);
+
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+            if (code) {
+                const qrData = code.data;
+                console.log('Decoded QR Code Data from File:', qrData); // Log data for debugging
+                processQRCodeData(qrData);
+            } else {
+                qrResult.textContent = 'No QR code detected in the image.';
+                savedImage.style.display = 'none';
+            }
+        }
+
+        // Start camera when page is ready
+        startCamera();
+    </script>
+
+</body>
+</html>
