@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Large File</title>
+</head>
+<body>
+    <h1>Download a Large Text File</h1>
+    <p>Click the button below to download a file containing one quadrillion 'q' characters.</p>
+    <button id="downloadButton">Download File</button>
+
+    <script>
+        document.getElementById('downloadButton').addEventListener('click', () => {
+            const totalSize = 10 ** 15; // One quadrillion characters
+            const chunkSize = 10 ** 6; // 1 MB chunks
+
+            let downloadedSize = 0;
+            const fileName = 'one_quadrillion_qs.txt';
+            const contentType = 'text/plain';
+            const chunks = [];
+
+            while (downloadedSize < totalSize) {
+                const remainingSize = totalSize - downloadedSize;
+                const currentChunkSize = Math.min(chunkSize, remainingSize);
+                const chunk = 'q'.repeat(currentChunkSize);
+                chunks.push(chunk);
+                downloadedSize += currentChunkSize;
+            }
+
+            const blob = new Blob(chunks, { type: contentType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
