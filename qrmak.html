@@ -91,6 +91,7 @@
         <label for="format-select">Choose Format:</label>
         <select id="format-select">
             <option value="1">WP1 (Black and White)</option>
+            <option value="H1">WP1 (Black and White) higher resolution</option>
             <option value="8">WP8 (8 Colors)</option>
             <option value="F">WPF (16 Colors)</option>
             <option value="TPDC">TPDC (Base64)</option>
@@ -125,7 +126,7 @@
         const formatSelect = document.getElementById('format-select');
 
         // Max QR code size (in characters)
-        const MAX_QR_CODE_SIZE = 2450; // Maximum allowed characters for the QR code
+        const MAX_QR_CODE_SIZE = 2470; // Maximum allowed characters for the QR code
 
         // Max resolution for the image
         const MAX_IMAGE_WIDTH = 42;
@@ -148,14 +149,21 @@
         captureBtn.addEventListener('click', function () {
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
-            
-            // Set canvas size to match max resolution
-            canvas.width = MAX_IMAGE_WIDTH;
-            canvas.height = MAX_IMAGE_HEIGHT;
+        if(formatSelect.value == "H1"){
+            //Set canvas size to match max resolution
+                canvas.width = 60;
+                canvas.height = 50;
+                // Scale the video feed to fit the canvas
+                context.drawImage(video, 0, 0, 60, 50);
+                formatSelect.value = "1"
+        }else{   
+                // Set canvas size to match max resolution
+                canvas.width = MAX_IMAGE_WIDTH;
+                canvas.height = MAX_IMAGE_HEIGHT;
 
-            // Scale the video feed to fit the canvas
-            context.drawImage(video, 0, 0, MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT);
-
+                // Scale the video feed to fit the canvas
+                context.drawImage(video, 0, 0, MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT);
+        }
             // Convert to Base64
             const base64Image = canvas.toDataURL('image/jpeg');
             processImageForQRCode(base64Image);
@@ -180,11 +188,7 @@
             const format = formatSelect.value;
             updateProgressBar(resizedBase64);
 
-            if (resizedBase64.length > MAX_QR_CODE_SIZE) {
-                qrResult.textContent = 'Image is too large to encode in QR Code.';
-                qrCodeDiv.style.display = 'none';
-                return;
-            }
+           
 
             generateQRCodeFromImage(resizedBase64, format);
         }
@@ -210,6 +214,11 @@
                 if (err) {
                     console.error('Error generating QR code:', err);
                     qrResult.textContent = 'Error generating QR code. Please try again.';
+                    if (qrData.length > MAX_QR_CODE_SIZE) {
+                        qrResult.textContent = 'Image is too large to encode in QR Code.';
+                        qrCodeDiv.style.display = 'none';
+                        return;
+                    }
                     return;
                 }
                 generatedQRCode.src = url;
