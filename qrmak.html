@@ -68,6 +68,9 @@
             background-color: #ccc;
             cursor: not-allowed;
         }
+        #format-selector {
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -82,6 +85,17 @@
 
     <!-- Button to capture image from webcam -->
     <button id="capture-btn">Capture Image</button>
+
+    <!-- Format Selector for WP (1, 8, F) or TPDC -->
+    <div id="format-selector">
+        <label for="format-select">Choose Format:</label>
+        <select id="format-select">
+            <option value="1">WP1 (Black and White)</option>
+            <option value="8">WP8 (8 Colors)</option>
+            <option value="F">WPF (16 Colors)</option>
+            <option value="TPDC">TPDC (Base64)</option>
+        </select>
+    </div>
 
     <div id="qr-result"></div>
     
@@ -108,6 +122,7 @@
         const downloadLink = document.getElementById('download-link');
         const progressBar = document.getElementById('progress-bar');
         const progressText = document.getElementById('progress-text');
+        const formatSelect = document.getElementById('format-select');
 
         // Max QR code size (in characters)
         const MAX_QR_CODE_SIZE = 2450; // Maximum allowed characters for the QR code
@@ -161,11 +176,8 @@
 
         // Process the image to ensure it fits within the QR code character limit
         function processImageForQRCode(base64Image) {
-           
             let resizedBase64 = base64Image;
-
-           
-
+            const format = formatSelect.value;
             updateProgressBar(resizedBase64);
 
             if (resizedBase64.length > MAX_QR_CODE_SIZE) {
@@ -174,22 +186,7 @@
                 return;
             }
 
-            generateQRCodeFromImage(resizedBase64);
-        }
-
-        // Compress image by reducing the quality
-        function compressImage(base64Image, quality) {
-            const img = new Image();
-            img.src = base64Image;
-
-            // Ensure compression finishes before processing
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = MAX_IMAGE_WIDTH;
-            canvas.height = MAX_IMAGE_HEIGHT;
-
-            context.drawImage(img, 0, 0, canvas.width, canvas.height);
-            return canvas.toDataURL('image/jpeg', quality);
+            generateQRCodeFromImage(resizedBase64, format);
         }
 
         // Update progress bar based on image size (in characters)
@@ -205,9 +202,11 @@
         }
 
         // Generate QR code with Base64 image data
-        function generateQRCodeFromImage(base64Image) {
-            const qrData = `TPDC_${base64Image.split(',')[1]}`; // Add prefix and extract Base64 part
-            QRCode.toDataURL(qrData, { errorCorrectionLevel: 'M',width: 3000, height: 3000 }, function (err, url) {
+        function generateQRCodeFromImage(base64Image, format) {
+            let qrData;
+            let newqrcode = function(qrData){
+                console.log(qrData);
+                QRCode.toDataURL(qrData, { errorCorrectionLevel: 'M', width: 3000, height: 3000 }, function (err, url) {
                 if (err) {
                     console.error('Error generating QR code:', err);
                     qrResult.textContent = 'Error generating QR code. Please try again.';
@@ -218,7 +217,144 @@
                 downloadLink.href = url;
                 downloadLink.style.display = 'inline';
                 qrResult.textContent = 'QR Code Generated Successfully!';
-            });
+            });}
+            
+              if (format === 'TPDC') {
+                    qrData = `TPDC_${base64Image.split(',')[1]}`;
+                    newqrcode(qrData)
+
+                } else {
+                    qrData = encodeWP(base64Image, format,newqrcode);
+                }
+            
+            
+        }
+
+        // Encode image to WP format (1, 8, F)
+   function encodeWP(base64Image, colorCode, callback) {
+                // Create an image element
+    const img = new Image();
+    img.src = base64Image;
+
+
+    // When the image is loaded, draw it to a canvas
+    img.onload = function() {
+        // Create a canvas element
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+
+        // Set canvas dimensions to the image's width and height
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        // Draw the image on the canvas
+        context.drawImage(img, 0, 0);
+        
+    const maxDimension = 15; // Maximální hodnota pro šířku a výšku (4 bity)
+    
+    // Získání rozměrů canvasu
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Výpočet vhodného multiplikátoru
+    let multiplier = 1;
+    while (Math.ceil(width / multiplier) > maxDimension || Math.ceil(height / multiplier) > maxDimension) {
+        multiplier++;
+        if (multiplier > 255) {
+            throw new Error("Obrázek je příliš velký, nelze ho zakódovat.");
+        }
+    }
+
+    // Přizpůsobená šířka a výška (po vydělení multiplikátorem)
+    const adjustedWidth = Math.ceil(width / multiplier);
+    const adjustedHeight = Math.ceil(height / multiplier);
+
+    // Zakódování šířky a výšky do jednoho ASCII znaku
+    const encodedWidthHeight = String.fromCharCode(((adjustedWidth << 4) | adjustedHeight) + 32);
+
+    // Zakódování multiplikátoru do ASCII znaku
+    const encodedMultiplier = String.fromCharCode(multiplier + 32);
+
+    // Získání kontextu a dat pixelů
+    
+    const imageData = context.getImageData(0, 0, width, height);
+    const pixelData = [];
+    const paletteBits = colorCode === "1" ? 1 : colorCode === "8" ? 3 : 4;
+
+    for (let i = 0; i < imageData.data.length; i += 4) {
+        // Získání hodnot RGB
+        const [r, g, b] = [imageData.data[i], imageData.data[i + 1], imageData.data[i + 2]];
+
+        // Převod na odpovídající barevný index
+        let colorIndex;
+        if (colorCode === "1") {
+            colorIndex = r + g + b > 382 ? 1 : 0; // Černobílá paleta
+        } else if (colorCode === "8") {
+            colorIndex = ((r > 128) << 2) | ((g > 128) << 1) | (b > 128); // Paleta 8 barev
+        } else if (colorCode === "F") {
+                // Převod na odpovídající index barvy podle palety 16 barev
+            if (Math.abs(r - g) < 30 && Math.abs(g - b) < 30) {
+                // Odstíny šedé (když jsou R, G, B podobné)
+                const brightness = (r + g + b) / 3;
+                if (brightness < 64) {
+                    colorIndex = 0b0000; // černá
+                } else if (brightness < 128) {
+                    colorIndex = 0b0001; // tmavě šedá
+                } else if (brightness < 192) {
+                    colorIndex = 0b1110; // šedá
+                } else {
+                    colorIndex = 0b1111; // bílá
+                }
+            } else if (r > g && r > b) {
+                // Červené odstíny
+                colorIndex = r > 128 ? 0b0010 : 0b0011; // červená nebo tmavě červená
+            } else if (g > r && g > b) {
+                // Zelené odstíny
+                colorIndex = g > 128 ? 0b0100 : 0b0101; // zelená nebo tmavě zelená
+            } else if (b > r && b > g) {
+                // Modré odstíny
+                colorIndex = b > 128 ? 0b0110 : 0b0111; // modrá nebo tmavě modrá
+            } else if (r > 128 && g > 128) {
+                // Žlutá
+                colorIndex = 0b1000;
+            } else if (r > 128 && b > 128) {
+                // Fialová
+                colorIndex = 0b1010;
+            } else if (g > 128 && b > 128) {
+                // Azurová
+                colorIndex = 0b1100;
+            } else if (r > 128 && g > 64 && b < 64) {
+                // Oranžová
+                colorIndex = 0b1001;
+            } else if (r > 128 && b > 64 && g < 64) {
+                // Růžová
+                colorIndex = 0b1011;
+            } else if (b > 128 && r > 64 && g < 64) {
+                // Světle modrá
+                colorIndex = 0b1101;
+            } else {
+                // Výchozí barva (černá)
+                colorIndex = 0b0000;
+            }
+        } else {
+            throw new Error("Neplatný kód barevné palety.");
+        }
+
+        // Převod indexu na binární řetězec
+        pixelData.push(colorIndex.toString(2).padStart(paletteBits, "0"));
+    }
+
+    // Spojení binárních dat a převod na ASCII znaky
+    const binaryString = pixelData.join("");
+    const asciiData = [];
+    for (let i = 0; i < binaryString.length; i += 8) {
+        const byte = binaryString.slice(i, i + 8).padEnd(8, "0"); // Doplň na 8 bitů
+        asciiData.push(String.fromCharCode(parseInt(byte, 2) + 32));
+    }
+
+    // Sestavení WP souboru
+    callback( `WP${colorCode}${encodedWidthHeight}${encodedMultiplier}${asciiData.join("")}`);
+}
         }
 
         // Start camera when page is ready
